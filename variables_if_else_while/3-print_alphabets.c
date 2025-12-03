@@ -1,17 +1,17 @@
-#include <stdlio.h>
+#include <stdio.h>
 
-int main(void) {
+int main(void)
+{
+    char c;
 
-    char c; 
-
-    // print lowercase
-    for(c = 'a': c <= 'z'; c++)
+    /* print lowercase */
+    for (c = 'a'; c <= 'z'; c++)
         putchar(c);
 
-    // print uppercase
-    for(c = 'A'; c <= 'Z'; c++)
+    /* print uppercase */
+    for (c = 'A'; c <= 'Z'; c++)
         putchar(c);
 
     putchar('\n');
-    return(0);
+    return (0);
 }
