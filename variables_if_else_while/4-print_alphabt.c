@@ -3,7 +3,6 @@
 /* main - display alphabet except q and except 
 return - seccess
 */
-
 int main(void) 
 {
     char c;
