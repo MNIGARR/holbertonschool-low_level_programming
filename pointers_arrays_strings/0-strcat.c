@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "main.h"
 
 /**
  * _strcat - concatenates two strings
@@ -7,7 +7,8 @@
  *
  * Return: pointer to dest
  */
-char *_strcat(char *dest, char *str) {
+char *_strcat(char *dest, char *src)
+{
     int i = 0;
     int j = 0;
 
@@ -16,9 +17,9 @@ char *_strcat(char *dest, char *str) {
         i++;
 
     /* append src to dest */
-    while (str[j] != '\0')
+    while (src[j] != '\0')
     {
-        dest[i] = str[j];
+        dest[i] = src[j];
         i++;
         j++;
     }
