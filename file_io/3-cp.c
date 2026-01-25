@@ -4,20 +4,39 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define BUF_SIZE 1024
+
 /**
- * print_error_and_exit - prints error message to STDERR and exits
- * @code: exit status code
- * @msg: error prefix message
- * @name: file name or fd string to print
+ * print_usage_and_exit - prints usage error and exits with 97
  */
-static void print_error_and_exit(int code, const char *msg, const char *name)
+static void print_usage_and_exit(void)
 {
-	dprintf(STDERR_FILENO, "%s%s\n", msg, name);
-	exit(code);
+	dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
+	exit(97);
 }
 
 /**
- * close_fd - closes a file descriptor and exits on failure
+ * exit_read_error - prints read error and exits with 98
+ * @file: file name
+ */
+static void exit_read_error(const char *file)
+{
+	dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", file);
+	exit(98);
+}
+
+/**
+ * exit_write_error - prints write error and exits with 99
+ * @file: file name
+ */
+static void exit_write_error(const char *file)
+{
+	dprintf(STDERR_FILENO, "Error: Can't write to %s\n", file);
+	exit(99);
+}
+
+/**
+ * close_fd - closes a fd, exits with 100 on failure
  * @fd: file descriptor
  */
 static void close_fd(int fd)
@@ -30,61 +49,103 @@ static void close_fd(int fd)
 }
 
 /**
- * main - copies the content of a file to another file
- * @ac: argument count
- * @av: argument vector
+ * open_from - opens source file for reading
+ * @file: file name
  *
- * Return: 0 on success, otherwise exits with required codes
+ * Return: fd
  */
-int main(int ac, char **av)
+static int open_from(const char *file)
+{
+	int fd = open(file, O_RDONLY);
+
+	if (fd == -1)
+		exit_read_error(file);
+
+	return (fd);
+}
+
+/**
+ * open_to - opens/creates destination file
+ * @file: file name
+ *
+ * Return: fd
+ */
+static int open_to(const char *file)
+{
+	int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+
+	if (fd == -1)
+		exit_write_error(file);
+
+	return (fd);
+}
+
+/**
+ * write_all - writes exactly count bytes
+ * @fd: destination fd
+ * @buf: buffer
+ * @count: bytes to write
+ * @to_name: destination file name for error message
+ */
+static void write_all(int fd, char *buf, ssize_t count, const char *to_name)
+{
+	ssize_t written = 0;
+	ssize_t w;
+
+	while (written < count)
+	{
+		w = write(fd, buf + written, count - written);
+		if (w == -1)
+			exit_write_error(to_name);
+		written += w;
+	}
+}
+
+/**
+ * copy_file - copies from one file to another using 1024-byte buffer
+ * @from_name: source filename
+ * @to_name: destination filename
+ */
+static void copy_file(const char *from_name, const char *to_name)
 {
 	int fd_from, fd_to;
-	ssize_t rbytes;
-	char buf[1024];
+	ssize_t r;
+	char buf[BUF_SIZE];
 
-	if (ac != 3)
+	fd_from = open_from(from_name);
+	fd_to = open_to(to_name);
+
+	r = read(fd_from, buf, BUF_SIZE);
+	while (r > 0)
 	{
-		dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-		exit(97);
+		write_all(fd_to, buf, r, to_name);
+		r = read(fd_from, buf, BUF_SIZE);
 	}
 
-	fd_from = open(av[1], O_RDONLY);
-	if (fd_from == -1)
-		print_error_and_exit(98, "Error: Can't read from file ", av[1]);
-
-	fd_to = open(av[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
-	if (fd_to == -1)
-	{
-		close_fd(fd_from);
-		print_error_and_exit(99, "Error: Can't write to ", av[2]);
-	}
-
-	while ((rbytes = read(fd_from, buf, 1024)) > 0)
-	{
-		ssize_t wbytes = 0, written;
-
-		while (wbytes < rbytes)
-		{
-			written = write(fd_to, buf + wbytes, rbytes - wbytes);
-			if (written == -1)
-			{
-				close_fd(fd_from);
-				close_fd(fd_to);
-				print_error_and_exit(99, "Error: Can't write to ", av[2]);
-			}
-			wbytes += written;
-		}
-	}
-
-	if (rbytes == -1)
+	if (r == -1)
 	{
 		close_fd(fd_from);
 		close_fd(fd_to);
-		print_error_and_exit(98, "Error: Can't read from file ", av[1]);
+		exit_read_error(from_name);
 	}
 
 	close_fd(fd_from);
 	close_fd(fd_to);
+}
+
+/**
+ * main - entry point
+ * @ac: argument count
+ * @av: argument vector
+ *
+ * Return: 0 on success
+ */
+int main(int ac, char **av)
+{
+	if (ac != 3)
+		print_usage_and_exit();
+
+	copy_file(av[1], av[2]);
 
 	return (0);
 }
