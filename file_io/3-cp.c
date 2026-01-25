@@ -1,30 +1,12 @@
 #include "main.h"
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
 
-#define BUF_SIZE 1024
-
-static void usage_exit(void)
-{
-	dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
-	exit(97);
-}
-
-static void read_error_exit(const char *file)
-{
-	dprintf(STDERR_FILENO, "Error: Can't read from file %s\n", file);
-	exit(98);
-}
-
-static void write_error_exit(const char *file)
-{
-	dprintf(STDERR_FILENO, "Error: Can't write to %s\n", file);
-	exit(99);
-}
-
-static void close_fd(int fd)
+/**
+ * close_fd - closes a file descriptor and exits on failure
+ * @fd: file descriptor to close
+ *
+ * Return: void
+ */
+void close_fd(int fd)
 {
 	if (close(fd) == -1)
 	{
@@ -33,68 +15,75 @@ static void close_fd(int fd)
 	}
 }
 
-static int open_from(const char *file)
+/**
+ * error - prints an error message and exits with a code
+ * @code: exit code
+ * @file: filename to print
+ * @fd1: fd to close or -1
+ * @fd2: fd to close or -1
+ * @msg: message format expecting %s
+ *
+ * Return: void
+ */
+void error(int code, const char *file, int fd1, int fd2, const char *msg)
 {
-	int fd = open(file, O_RDONLY);
+	dprintf(STDERR_FILENO, msg, file);
 
-	if (fd == -1)
-		read_error_exit(file);
-
-	return (fd);
-}
-
-static int open_to(const char *file)
-{
-	int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0664);
-
-	if (fd == -1)
-		write_error_exit(file);
-
-	return (fd);
-}
-
-static void write_all(int fd, char *buf, ssize_t count, const char *to_name)
-{
-	ssize_t written = 0;
-	ssize_t w;
-
-	while (written < count)
+	if (fd1 != -1)
 	{
-		w = write(fd, buf + written, count - written);
-		if (w == -1)
-			write_error_exit(to_name);
-		written += w;
+		close_fd(fd1);
 	}
+
+	if (fd2 != -1)
+	{
+		close_fd(fd2);
+	}
+
+	exit(code);
 }
 
-static void copy_file(const char *from_name, const char *to_name)
+/**
+ * main - copies the content of a file to another file
+ * @argc: number of arguments
+ * @argv: array of arguments
+ *
+ * Return: 0 (Success))
+ */
+int main(int argc, char *argv[])
 {
-	int fd_from, fd_to;
-	ssize_t r;
-	char buf[BUF_SIZE];
+	int from, to;
+	ssize_t r, w;
+	char buf[1 << 10];
 
-	fd_from = open_from(from_name);
-	fd_to = open_to(to_name);
-
-	while ((r = read(fd_from, buf, BUF_SIZE)) > 0)
-		write_all(fd_to, buf, r, to_name);
-
+	if (argc != 3)
+	{
+		dprintf(STDERR_FILENO, "Usage: cp file_from file_to\n");
+		exit(97);
+	}
+	from = open(argv[1], O_RDONLY);
+	if (from == -1)
+	{
+		error(98, argv[1], -1, -1, "Error: Can't read from file %s\n");
+	}
+	to = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0664);
+	if (to == -1)
+	{
+		error(99, argv[2], from, -1, "Error: Can't write to %s\n");
+	}
+	while ((r = read(from, buf, 1 << 10)))
+	{
+		w = write(to, buf, r);
+		if (w != r)
+		{
+			error(99, argv[2], from, to, "Error: Can't write to %s\n");
+		}
+	}
 	if (r == -1)
 	{
-		close_fd(fd_from);
-		close_fd(fd_to);
-		read_error_exit(from_name);
+		error(98, argv[1], from, to, "Error: Can't read from file %s\n");
 	}
+	close_fd(from);
+	close_fd(to);
 
-	close_fd(fd_from);
-	close_fd(fd_to);
-}
-
-int main(int ac, char **av)
-{
-	if (ac != 3)
-		usage_exit();
-
-	copy_file(av[1], av[2]);
 	return (0);
 }
